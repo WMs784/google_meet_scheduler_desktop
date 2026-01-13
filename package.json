@@ -1,0 +1,16 @@
+{
+  "name": "google-meet-scheduler",
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
