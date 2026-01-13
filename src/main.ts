@@ -177,9 +177,6 @@ function openMeetActive(meetUrl: string) {
   console.log(`[openMeetActive] BrowserWindow created, loading URL...`);
   meetWindow.loadURL(meetUrl);
 
-  // 開発者ツールを開く
-  meetWindow.webContents.openDevTools();
-
   meetWindow.webContents.on("did-finish-load", () => {
     console.log(`[openMeetActive] Page loaded, executing auto-join script...`);
     meetWindow?.webContents.executeJavaScript(`
