@@ -191,6 +191,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   try {
     const events = await getTodayEvents();
     ipcRenderer.send("today-events", events);
+    await ipcRenderer.invoke("SET_TODAY_EVENTS", events);
     console.log("[preload] Auto-fetch completed:", events.length, "events");
   } catch (error) {
     console.error("[preload] Auto-fetch failed:", error);
@@ -207,6 +208,7 @@ contextBridge.exposeInMainWorld("calendar", {
 
     // main にも通知したい場合
     ipcRenderer.send("today-events", events);
+    await ipcRenderer.invoke("SET_TODAY_EVENTS", events);
 
     return events;
   },

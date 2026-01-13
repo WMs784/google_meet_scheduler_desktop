@@ -46,7 +46,8 @@ function createTray() {
   const iconPath = path.join(__dirname, "tray.png"); // ★後述
   const icon = nativeImage.createFromPath(iconPath);
 
-  tray = new Tray(icon);
+  const trayIconPath = path.join(__dirname, "assets", "tray.png");
+  tray = new Tray(trayIconPath);
   tray.setToolTip("Today Calendar Events");
 
   updateTrayMenu();
@@ -83,7 +84,7 @@ function updateTrayMenu() {
         menuTemplate.push({
           label: "  ▶ Google Meet に参加",
           click: () => {
-            shell.openExternal(event.meetUrl);
+            shell.openExternal(event.meetUrl!);
           },
         });
       } else {
@@ -130,6 +131,7 @@ ipcMain.on("open-meet", (_event, url: string) => {
 });
 
 ipcMain.handle("SET_TODAY_EVENTS", (_e, events: TodayEvent[]) => {
+  console.log(`[IPC] SET_TODAY_EVENTS received with ${events.length} events`);
   scheduleMeetAutoJoin(events);
 });
 
@@ -153,7 +155,10 @@ function clearScheduledTimers() {
 }
 
 function openMeetActive(meetUrl: string) {
+  console.log(`[openMeetActive] Opening Meet window: ${meetUrl}`);
+
   if (meetWindow) {
+    console.log(`[openMeetActive] Closing existing meet window`);
     meetWindow.close();
     meetWindow = null;
   }
@@ -169,20 +174,31 @@ function openMeetActive(meetUrl: string) {
     },
   });
 
+  console.log(`[openMeetActive] BrowserWindow created, loading URL...`);
   meetWindow.loadURL(meetUrl);
 
+  // 開発者ツールを開く
+  meetWindow.webContents.openDevTools();
+
   meetWindow.webContents.on("did-finish-load", () => {
+    console.log(`[openMeetActive] Page loaded, executing auto-join script...`);
     meetWindow?.webContents.executeJavaScript(`
     window.meetAutoJoin?.start();
   `);
   });
 
+  meetWindow.webContents.on("console-message", (_event, level, message) => {
+    console.log(`[Meet Window Console] ${message}`);
+  });
+
   meetWindow.once("ready-to-show", () => {
+    console.log(`[openMeetActive] Window ready, showing...`);
     meetWindow?.show();
     meetWindow?.focus();
   });
 
   meetWindow.on("closed", () => {
+    console.log(`[openMeetActive] Meet window closed`);
     meetWindow = null;
   });
 }
@@ -190,28 +206,67 @@ function openMeetActive(meetUrl: string) {
 function scheduleMeetAutoJoin(events: TodayEvent[]) {
   clearScheduledTimers();
 
+  console.log(
+    `[AutoJoin] scheduleMeetAutoJoin called with ${events.length} events`
+  );
+
   const now = new Date();
+  console.log(`[AutoJoin] Current time: ${now.toLocaleTimeString()}`);
 
   for (const event of events) {
-    if (!event.meetUrl || !event.startTime) continue;
+    console.log(`[AutoJoin] Processing event: ${event.title}`);
+    console.log(`[AutoJoin]   - meetUrl: ${event.meetUrl}`);
+    console.log(`[AutoJoin]   - startTime: ${event.startTime}`);
+
+    if (!event.meetUrl || !event.startTime) {
+      console.log(`[AutoJoin]   - Skipping (no meetUrl or startTime)`);
+      continue;
+    }
 
     const [h, m] = event.startTime.split(":").map(Number);
+    console.log(`[AutoJoin]   - Parsed time: ${h}:${m}`);
 
     const eventTime = new Date();
     eventTime.setHours(h, m, 0, 0);
 
     const joinTime = new Date(eventTime.getTime() - 60 * 1000);
     const diff = joinTime.getTime() - now.getTime();
+    const tenMinutesAfterStart = eventTime.getTime() + 10 * 60 * 1000;
 
-    if (diff <= 0) continue; // すでに過ぎている
+    console.log(`[AutoJoin]   - Event time: ${eventTime.toLocaleTimeString()}`);
+    console.log(
+      `[AutoJoin]   - Join time (1min before): ${joinTime.toLocaleTimeString()}`
+    );
+    console.log(`[AutoJoin]   - Time until join: ${Math.round(diff / 1000)}s`);
 
-    console.log(`[AutoJoin] ${event.title} → ${joinTime.toLocaleTimeString()}`);
+    // 開始後10分を過ぎていたらスキップ
+    if (now.getTime() > tenMinutesAfterStart) {
+      console.log(`[AutoJoin]   - Skipping (more than 10 minutes after start)`);
+      continue;
+    }
+
+    // 既に参加時刻を過ぎている場合は即座に参加
+    if (diff <= 0) {
+      console.log(
+        `[AutoJoin]   - Join time already passed, opening immediately`
+      );
+      openMeetActive(event.meetUrl!);
+      continue;
+    }
+
+    console.log(
+      `[AutoJoin] ✓ Scheduled: ${
+        event.title
+      } → ${joinTime.toLocaleTimeString()}`
+    );
 
     const timer = setTimeout(() => {
-      console.log(`[AutoJoin] Opening Meet: ${event.meetUrl}`);
+      console.log(`[AutoJoin] ⏰ Opening Meet: ${event.meetUrl}`);
       openMeetActive(event.meetUrl!);
     }, diff);
 
     scheduledTimers.push(timer);
   }
+
+  console.log(`[AutoJoin] Total scheduled: ${scheduledTimers.length} meetings`);
 }

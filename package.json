@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsc && electron ."
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp -R src/assets dist/assets",
+    "start": "npm run build && electron ."
   },
   "devDependencies": {
     "electron": "^30.5.1",
